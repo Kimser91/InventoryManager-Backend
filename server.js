@@ -6,8 +6,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const ordersRoutes = require('./routes/orders');
-app.use('/api/orders', ordersRoutes);
+const inventoryRoutes = require('./routes/inventory');
+app.use('/api/inventory', inventoryRoutes);
 
 app.get('/', (req, res) => {
     res.send('Inventory Administrator API is running');
