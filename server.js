@@ -13,5 +13,9 @@ app.get('/', (req, res) => {
     res.send('Inventory Administrator API is running');
 });
 
+const orderRoutes = require('./routes/orders'); // 👈 Importer ruten
+app.use('/api/orders', orderRoutes); // 👈 Bruk ruten
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
