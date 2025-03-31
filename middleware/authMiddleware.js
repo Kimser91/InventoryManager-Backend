@@ -1,7 +1,8 @@
-const jwt = require('jsonwebtoken');
+/*const jwt = require('jsonwebtoken');
 
 module.exports = (req, res, next) => {
-    const token = req.header('Authorization');
+    const token = req.headers.authorization;
+    console.log("Authorization header:", req.headers.authorization);
     if (!token) {
         return res.status(401).json({ message: "Ingen tilgang, token mangler" });
     }
@@ -13,4 +14,4 @@ module.exports = (req, res, next) => {
     } catch (error) {
         res.status(401).json({ message: "Token er ugyldig" });
     }
-};
+};*/
