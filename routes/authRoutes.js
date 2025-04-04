@@ -26,10 +26,10 @@ const { register, login, getUser } = require('../controllers/authController');
 // const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
-
+console.log(router)
 router.post('/register', register);
 router.post('/login', login);
-router.get('/user', /*authMiddleware,*/ async (req, res) => {
+router.get('/user', async (req, res) => {
     try {
         // Hvis du trenger å teste, kan du bruke en hardkodet bruker-ID:
         const testUserId = 1;
