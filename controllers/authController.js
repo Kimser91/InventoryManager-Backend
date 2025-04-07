@@ -73,7 +73,6 @@ exports.login = async (req, res) => {
     }
 };
 
-// Hent bruker (beskyttet rute)
 exports.getUser = async (req, res) => {
     try {
         const userId = req.user.id;
