@@ -7,30 +7,23 @@ require('dotenv').config();
 exports.register = async (req, res) => {
     try {
         console.log("jeg har kommet til authController")
-        const { username, email, password } = req.body;
-
+        const { username, email, password, companyName } = req.body;
+        console.log("company name: ", req.body)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        let companyId;
+        const [companyResult] = await pool.execute( "INSERT INTO companies (name) VALUES (?)", [companyName]);
 
-        // Sjekk om det allerede finnes noen brukere
-        const [existingCompanies] = await pool.execute("SELECT MAX(company_id) AS maxCompanyId FROM users");
+        const companyId = companyResult.insertId;
 
-        if (existingCompanies.length > 0 && existingCompanies[0].maxCompanyId !== null) {
-            companyId = existingCompanies[0].maxCompanyId + 1; // 👈 Legg til 1 på høyeste company_id
-        } else {
-            companyId = 1; // Første bruker -> company_id = 1
-        }
-
-        console.log("Setter company_id:", companyId);
+        console.log("Company ID: ", companyId);
 
         await pool.execute(
             "INSERT INTO users (username, email, password_hash, role, company_id) VALUES (?, ?, ?, 'Hovedadmin', ?)",
             [username, email, hashedPassword, companyId]
         );
 
-        res.status(201).json({ message: "Hovedadmin opprettet!" });
+        res.status(201).json({ message: "Hovedadmin opprettet med firma!" });
     } catch (error) {
         console.error("❌ Feil ved registrering:", error);
         res.status(500).json({ error: error.message });
