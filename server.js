@@ -15,9 +15,6 @@ app.use(cors(corsOptions));
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
 
-const userRoutes = require('./routes/userRoutes');
-app.use('/api/users', userRoutes);
-
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 

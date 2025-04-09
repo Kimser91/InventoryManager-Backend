@@ -4,24 +4,33 @@ const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// 📋 Hent alle brukere
 router.get('/users', authMiddleware, async (req, res) => {
     try {
-        const [users] = await pool.execute(
-            "SELECT id, username, email, role, permissions, can_see_all FROM users WHERE company_id = ?",
-            [req.user.company_id]
-        );
-        res.json(users);
+      let query;
+      let params = [];
+  
+      if (req.user.role === 'Superadmin') {
+        query = "SELECT id, username, email, role, company_id FROM users";
+      } else {
+        query = "SELECT id, username, email, role FROM users WHERE company_id = ?";
+        params = [req.user.company_id];
+      }
+  
+      const [users] = await pool.query(query, params);
+      res.json(users);
     } catch (error) {
-        console.error("❌ Feil ved henting av brukere:", error);
-        res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message });
     }
-});
-
-// ➕ Legg til ny bruker
+  });
+  
 router.post('/users', authMiddleware, async (req, res) => {
     try {
         const { username, email, password, role, permissions, can_see_all } = req.body;
+
+        if (role === 'Superadmin') {
+            return res.status(403).json({ message: "Ikke lov å lage en Superadmin-bruker" });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -37,10 +46,13 @@ router.post('/users', authMiddleware, async (req, res) => {
     }
 });
 
-// ✏️ Rediger eksisterende bruker
 router.put('/users/:id', authMiddleware, async (req, res) => {
     try {
         const { username, email, role, permissions, can_see_all } = req.body;
+
+        if (role === 'Superadmin') {
+            return res.status(403).json({ message: "Ikke lov å oppdatere eller lage Superadmin-bruker" });
+        }
 
         await pool.execute(
             "UPDATE users SET username = ?, email = ?, role = ?, permissions = ?, can_see_all = ? WHERE id = ? AND company_id = ?",
@@ -62,7 +74,6 @@ router.put('/users/:id', authMiddleware, async (req, res) => {
     }
 });
 
-// 🔐 Endre brukerens passord
 router.put('/users/:id/password', authMiddleware, async (req, res) => {
     try {
         const { newPassword } = req.body;
@@ -81,7 +92,6 @@ router.put('/users/:id/password', authMiddleware, async (req, res) => {
     }
 });
 
-// ❌ Slett bruker
 router.delete('/users/:id', authMiddleware, async (req, res) => {
     try {
         await pool.execute(

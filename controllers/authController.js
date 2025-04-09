@@ -76,13 +76,19 @@ exports.login = async (req, res) => {
 exports.getUser = async (req, res) => {
     try {
         const userId = req.user.id;
-        const [rows] = await pool.execute("SELECT id, username, email, role FROM users WHERE id = ?", [userId]);
+        const [rows] = await pool.execute("SELECT id, username, email, role, permissions, can_see_all FROM users WHERE id = ?", [userId]);
 
         if (rows.length === 0) {
             return res.status(404).json({ message: "Bruker ikke funnet" });
         }
 
-        res.json(rows[0]);
+        const user = rows[0];
+
+        if (user.permissions && typeof user.permissions === 'string' && !user.permissions.startsWith('[')) {
+            user.permissions = JSON.stringify([user.permissions]);
+        }
+
+        res.json(user);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
