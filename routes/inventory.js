@@ -23,7 +23,7 @@ router.get("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ➕ Legg til et nytt produkt
+// ➕ Legg til nytt produkt
 router.post("/", authMiddleware, async (req, res) => {
   const { product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner } = req.body;
   try {
@@ -31,7 +31,7 @@ router.post("/", authMiddleware, async (req, res) => {
       `INSERT INTO inventory 
        (product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner, company_id, is_ordered) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE)`,
-      [product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner, req.user.company_id]
+      [product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner || ' ', req.user.company_id]
     );
     res.json({ message: "Produkt lagt til!", id: result.insertId });
   } catch (err) {
@@ -39,19 +39,36 @@ router.post("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ✏️ Oppdater et produkt og resett `is_ordered` hvis nødvendig
+// ✏️ Oppdater et produkt
 router.put("/:id", authMiddleware, async (req, res) => {
-  const { stock_quantity, min_threshold, max_stock, price } = req.body;
+  const { product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner } = req.body;
   try {
     await pool.query(
       `UPDATE inventory 
-       SET stock_quantity = ?, min_threshold = ?, max_stock = ?, price = ?, 
-           is_ordered = CASE 
-              WHEN ? >= min_threshold THEN FALSE 
-              ELSE is_ordered 
-           END
+       SET 
+         product_name = ?, 
+         store_name = ?, 
+         article_number = ?, 
+         stock_quantity = ?, 
+         min_threshold = ?, 
+         max_stock = ?, 
+         price = ?, 
+         owner = ?, 
+         is_ordered = CASE WHEN ? >= min_threshold THEN FALSE ELSE is_ordered END 
        WHERE id = ? AND company_id = ?`,
-      [stock_quantity, min_threshold, max_stock, price, stock_quantity, req.params.id, req.user.company_id]
+      [
+        product_name,
+        store_name,
+        article_number,
+        stock_quantity,
+        min_threshold,
+        max_stock,
+        price,
+        owner || ' ',
+        stock_quantity,
+        req.params.id,
+        req.user.company_id
+      ]
     );
     res.json({ message: "Produkt oppdatert!" });
   } catch (err) {
@@ -59,7 +76,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// 🗑️ Slett et produkt fra lageret
+// 🗑️ Slett et produkt
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM inventory WHERE id = ? AND company_id = ?", [req.params.id, req.user.company_id]);
@@ -69,7 +86,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// ⚙️ Generer ordre for produkter som er under minimum
+// ⚙️ Generer ordre automatisk
 router.post("/generate-orders", authMiddleware, async (req, res) => {
   try {
     const [items] = await pool.query(`
