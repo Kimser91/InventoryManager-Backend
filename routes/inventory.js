@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
 const authMiddleware = require('../middleware/authMiddleware');
+const { Script } = require("vm");
 
 // 📦 Hent hele lagerbeholdningen
 router.get("/", authMiddleware, async (req, res) => {
@@ -23,7 +24,6 @@ router.get("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ➕ Legg til nytt produkt
 router.post("/", authMiddleware, async (req, res) => {
   const { product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner } = req.body;
   try {
@@ -39,7 +39,6 @@ router.post("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ✏️ Oppdater et produkt
 router.put("/:id", authMiddleware, async (req, res) => {
   const { product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner } = req.body;
   try {
@@ -76,7 +75,6 @@ router.put("/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// 🗑️ Slett et produkt
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM inventory WHERE id = ? AND company_id = ?", [req.params.id, req.user.company_id]);
@@ -86,7 +84,6 @@ router.delete("/:id", authMiddleware, async (req, res) => {
   }
 });
 
-// ⚙️ Generer ordre automatisk
 router.post("/generate-orders", authMiddleware, async (req, res) => {
   try {
     const [items] = await pool.query(`
@@ -123,10 +120,65 @@ router.post("/generate-orders", authMiddleware, async (req, res) => {
       }
     }
 
-    res.json({ message: "Bestillinger generert!" });
+   res.json({ message: "Bestillinger generert!" });
   } catch (error) {
     console.error("Error generating orders:", error);
     res.status(500).json({ error: "Database error" });
+  }
+});
+
+router.post("/:id/clone", authMiddleware, async (req, res) => {
+  const { newOwners } = req.body; 
+  const { id } = req.params;
+
+  if (!Array.isArray(newOwners) || newOwners.length === 0) {
+    return res.status(400).json({ error: "No owners provided for cloning" });
+  }
+
+  try {
+    const [products] = await pool.query(
+      "SELECT * FROM inventory WHERE id = ? AND company_id = ?",
+      [id, req.user.company_id]
+    );
+
+    if (products.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    const product = products[0];
+
+    for (const newOwner of newOwners) {
+      const [existing] = await pool.query(
+        "SELECT id FROM inventory WHERE article_number = ? AND owner = ? AND company_id = ?",
+        [product.article_number, newOwner, req.user.company_id]
+      );
+
+      if (existing.length > 0) {
+        console.log(`⚠️ Product already exists for owner: ${newOwner}`);
+        continue;
+      }
+
+      await pool.query(
+        `INSERT INTO inventory 
+          (product_name, store_name, article_number, stock_quantity, min_threshold, max_stock, price, owner, company_id, is_ordered)
+         VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, FALSE)`,
+        [
+          product.product_name,
+          product.store_name,
+          product.article_number,
+          product.min_threshold,
+          product.max_stock,
+          product.price,
+          newOwner,
+          req.user.company_id
+        ]
+      );
+    }
+
+    res.json({ message: "Product cloned successfully to selected owners!" });
+  } catch (error) {
+    console.error("❌ Error cloning product:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
