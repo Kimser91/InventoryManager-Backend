@@ -52,23 +52,25 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 // ✅ Fullfør en ordre (oppdater lager og slett ordre)
 router.put("/:id/complete", authMiddleware, async (req, res) => {
   try {
-    const [order] = await pool.query("SELECT * FROM orders WHERE id = ?", [req.params.id]);
+    const [orderResult] = await pool.query("SELECT * FROM orders WHERE id = ?", [req.params.id]);
 
-    if (order.length === 0) {
+    if (orderResult.length === 0) {
       return res.status(404).json({ error: "Ordren finnes ikke" });
     }
 
-    if (req.user.role !== 'Superadmin' && order[0].company_id !== req.user.company_id) {
+    const order = orderResult[0];
+
+    if (req.user.role !== 'Superadmin' && order.company_id !== req.user.company_id) {
       return res.status(403).json({ error: "Ingen tilgang til å fullføre denne ordren" });
     }
 
-    const { article_number, quantity } = order[0];
+    const { article_number, quantity, inventory_id, company_id } = order;
 
     await pool.query(
       `UPDATE inventory 
        SET stock_quantity = stock_quantity + ?, is_ordered = FALSE 
-       WHERE article_number = ? AND company_id = ?`,
-      [quantity, article_number, req.user.company_id]
+       WHERE id = ? AND article_number = ? AND company_id = ?`,
+      [quantity, inventory_id, article_number, company_id]
     );
 
     await pool.query("DELETE FROM orders WHERE id = ?", [req.params.id]);
@@ -78,5 +80,6 @@ router.put("/:id/complete", authMiddleware, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 module.exports = router;

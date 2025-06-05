@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
 const authMiddleware = require('../middleware/authMiddleware');
-const { Script } = require("vm");
+
 
 // 📦 Hent hele lagerbeholdningen
 router.get("/", authMiddleware, async (req, res) => {
@@ -100,17 +100,29 @@ router.post("/generate-orders", authMiddleware, async (req, res) => {
 
     for (const item of items) {
       const [existingOrder] = await pool.query(
-        "SELECT id FROM orders WHERE article_number = ? AND status = 'pending' AND company_id = ?",
-        [item.article_number, req.user.company_id]
+        "SELECT id FROM orders WHERE article_number = ? AND status = 'pending' AND company_id = ? AND inventory_id = ?",
+        [item.article_number, item.company_id, item.id]
       );
 
       if (existingOrder.length === 0) {
         const orderQuantity = item.max_stock - item.stock_quantity;
 
+        // Unngå å legge inn ordre med 0 eller negativ mengde
+        if (orderQuantity <= 0) continue;
+
         await pool.query(
-          `INSERT INTO orders (product_name, store_name, article_number, quantity, owner, company_id, status) 
-           VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-          [item.product_name, item.store_name, item.article_number, orderQuantity, item.owner, req.user.company_id]
+          `INSERT INTO orders (
+            product_name, store_name, article_number, quantity, owner, company_id, status, inventory_id
+          ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+          [
+            item.product_name,
+            item.store_name,
+            item.article_number,
+            orderQuantity,
+            item.owner,
+            item.company_id,
+            item.id
+          ]
         );
 
         await pool.query(
@@ -120,7 +132,7 @@ router.post("/generate-orders", authMiddleware, async (req, res) => {
       }
     }
 
-   res.json({ message: "Bestillinger generert!" });
+    res.json({ message: "Bestillinger generert!" });
   } catch (error) {
     console.error("Error generating orders:", error);
     res.status(500).json({ error: "Database error" });
